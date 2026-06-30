@@ -3,6 +3,18 @@ import sys
 import os
 
 # ──────────────────────────────────────────────
+#  AUTO-LOAD .env  (before anything else)
+# ──────────────────────────────────────────────
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_file):
+    with open(_env_file) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
+# ──────────────────────────────────────────────
 #  AUTO-INSTALL REQUIREMENTS
 # ──────────────────────────────────────────────
 _req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
@@ -339,7 +351,7 @@ async def send_with_cover(ctx, chat_id, file_id, cover_file_id,
         await ctx.bot.send_video(
             chat_id=chat_id,
             video=file_id,
-            cover=cover_file_id,
+            thumbnail=cover_file_id,
             caption=caption,
             caption_entities=entities,
             supports_streaming=True,
