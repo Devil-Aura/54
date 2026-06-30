@@ -1,4 +1,20 @@
+import subprocess
+import sys
 import os
+
+# ──────────────────────────────────────────────
+#  AUTO-INSTALL REQUIREMENTS
+# ──────────────────────────────────────────────
+_req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
+if os.path.exists(_req_file):
+    print("📦 Checking and installing requirements…")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "-q", "-r", _req_file],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
+    )
+    print("✅ Requirements ready.")
+
 import re
 import logging
 from datetime import datetime
