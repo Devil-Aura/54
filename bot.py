@@ -43,7 +43,7 @@ from telegram.error import TelegramError
 from pymongo import MongoClient
 
 # ──────────────────────────────────────────────
-#  CONFIG  (set via environment or edit here)
+#  CONFIG  (set via environment or .env file)
 # ──────────────────────────────────────────────
 BOT_TOKEN         = os.getenv("BOT_TOKEN", "")
 FORCE_SUB_CHANNEL = int(os.getenv("FORCE_SUB_CHANNEL", "-1002432405855"))
@@ -51,6 +51,13 @@ MONGO_URI         = os.getenv(
     "MONGO_URI",
     "mongodb+srv://cover:cover0123@cluster0.oilx4yu.mongodb.net/?appName=Cluster0",
 )
+# Owner and admins receive a DM when the bot starts/restarts
+# Set OWNER_ID and ADMIN_IDS (comma-separated) in your .env file
+OWNER_ID   = int(os.getenv("OWNER_ID", "0"))
+ADMIN_IDS  = [
+    int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",")
+    if x.strip().lstrip("-").isdigit()
+]
 
 # ──────────────────────────────────────────────
 #  MONGODB
@@ -348,15 +355,17 @@ async def send_with_cover(ctx, chat_id, file_id, cover_file_id,
             reply_to_message_id=reply_to,
         )
     else:
+        # Use api_kwargs to pass 'cover' directly to Telegram Bot API
+        # (PTB 21.x exposes it as api_kwargs; PTB 22.x has it as a native param)
         await ctx.bot.send_video(
             chat_id=chat_id,
             video=file_id,
-            thumbnail=cover_file_id,
             caption=caption,
             caption_entities=entities,
             supports_streaming=True,
             has_spoiler=has_spoiler,
             reply_to_message_id=reply_to,
+            api_kwargs={"cover": cover_file_id},
         )
 
 # ──────────────────────────────────────────────
@@ -1336,13 +1345,43 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 # ══════════════════════════════════════════════
+#  STARTUP NOTIFICATION
+# ══════════════════════════════════════════════
+async def notify_on_start(app: Application) -> None:
+    """Send a DM to owner and all admins when bot starts or restarts."""
+    notify_ids = set()
+    if OWNER_ID:
+        notify_ids.add(OWNER_ID)
+    notify_ids.update(ADMIN_IDS)
+
+    if not notify_ids:
+        return
+
+    text = (
+        "🟢 <b>Bot is now ONLINE!</b>\n\n"
+        "🎬 Anime Cover Bot started successfully.\n"
+        "⚡ @World_Fastest_Bots"
+    )
+    for uid in notify_ids:
+        try:
+            await app.bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+        except Exception as e:
+            logger.warning(f"Startup notify failed for {uid}: {e}")
+
+
+# ══════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════
 def main():
     if not BOT_TOKEN:
         raise ValueError("BOT_TOKEN is not set. Set it via the BOT_TOKEN environment variable.")
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .post_init(notify_on_start)
+        .build()
+    )
 
     # ── Commands in private/group chats ────────
     for cmd, fn in [
